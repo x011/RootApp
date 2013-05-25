@@ -1,0 +1,3 @@
+Simple Android app showing the usage of the JNI to perform superuser calls that do not block the main thread.
+
+Also features a very aggressive proguard config.
