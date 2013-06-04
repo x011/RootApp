@@ -1,7 +1,6 @@
 #ifndef _PIMAGE_H_
 #define _PIMAGE_H_
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -15,29 +14,44 @@ typedef struct {
 } processimage;
 
 static processimage*
-mkprocess(const char *cmd, const short in, const short out, const short err) {
+mkprocess(const char *cmd, const char in, const char out, const char err) {
 	int infd[2], outfd[2], errfd[2];
 	pid_t child;
-	processimage *pimage;
-	
-	if(in) pipe(infd);
-	if(out) pipe(outfd);
-	if(err) pipe(errfd);
-	child = fork();
-	
+	processimage* const pimage = malloc(sizeof(processimage));
+	if(!pimage)
+		return NULL;
+
+	if(in)
+		if(pipe(infd))
+			goto END;
+	if(out)
+		if(pipe(outfd))
+			goto END;
+	if(err)
+		if(pipe(errfd))
+			goto END;
+	if((child = fork()) == -1)
+		goto END;
+
 	if(child) {
 		pimage->pid = child;
 		if(in) {
 			close(infd[0]);
 			pimage->infd = infd[1];
+		} else {
+			pimage->infd = 0;
 		}
 		if(out) {
 			close(outfd[1]);
 			pimage->outfd = outfd[0];
+		} else {
+			pimage->outfd = 0;
 		}
 		if(err) {
 			close(errfd[1]);
 			pimage->errfd = errfd[0];
+		} else {
+			pimage->errfd = 0;
 		}
 		return pimage;
 	} else {
@@ -55,16 +69,21 @@ mkprocess(const char *cmd, const short in, const short out, const short err) {
 		}
 		execlp(cmd, cmd, NULL);
 	}
+	END:
+	free(pimage);
 	return NULL;
 }
 
 static void
-rmprocess(const processimage *pimage) {
-	fsync(pimage->infd);
-	close(pimage->infd);
-	close(pimage->outfd);
-	close(pimage->errfd);
+rmprocess(processimage *pimage) {
+	if(pimage->infd)
+		close(pimage->infd);
+	if(pimage->outfd)
+		close(pimage->outfd);
+	if(pimage->errfd)
+		close(pimage->errfd);
 	waitpid(pimage->pid, NULL, 0);
+	free(pimage);
 }
 
 #endif

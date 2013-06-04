@@ -9,26 +9,33 @@ static processimage *process;
 
 jboolean
 Java_koneu_rootapp_MainActivity_sudo(JNIEnv *env, jobject obj, jstring xmd) {
-	char *cmd;
+	const char *cmd = ((*env)->GetStringUTFChars(env, xmd, 0));
 	jboolean ret = JNI_TRUE;
 	if(process) {
-		/* using asprintf here is a little overkill */
-		int count = asprintf(&cmd, "%s\n", ((*env)->GetStringUTFChars(env, xmd, 0)));
-		if(write(process->infd, cmd, count) != count) {
-			ret = JNI_FALSE;
+		while(cmd[0]  != 0) {
+			if(write(process->infd, cmd, 1) != 1) {
+				ret = JNI_FALSE;
+				goto END;
+			}
+			cmd++;
 		}
+		if(write(process->infd, "\n", 1) != 1)
+			ret = JNI_FALSE;
 	} else {
-		asprintf(&cmd, "su -c \"%s\"", ((*env)->GetStringUTFChars(env, xmd, 0)));
-		if(system(cmd) != EXIT_SUCCESS) {
+		char *buf;
+		asprintf(&buf, "su -c \"%s\"", cmd);
+		if(system(cmd) != EXIT_SUCCESS)
 			ret = JNI_FALSE;
-		}
 	}
+	END:
+	(*env)->ReleaseStringUTFChars(env, xmd, cmd);
 	return ret;
 }
 
 void
 Java_koneu_rootapp_MainActivity_startshell(JNIEnv *env, jobject obj) {
-	if(!process) process = mkprocess("su", 1, 0, 0);
+	if(!process)
+		process = mkprocess("su", 1, 0, 0);
 }
 
 void
